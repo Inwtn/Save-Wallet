@@ -19,9 +19,9 @@ function applyTheme(theme) {
   document.documentElement.dataset.theme = theme;
   $('themeToggle').textContent = theme === 'dark' ? '☀' : '☾';
   $('themeToggle').setAttribute('aria-label', theme === 'dark' ? 'Ativar modo claro' : 'Ativar modo escuro');
-  document.querySelector('meta[name=theme-color]').content = theme === 'dark' ? '#111814' : '#f7f8f5';
+  document.querySelector('meta[name=theme-color]').content = theme === 'dark' ? '#111315' : '#f7f8f5';
 }
-applyTheme(localStorage.getItem(themeKey) || 'light');
+applyTheme(localStorage.getItem(themeKey) || 'dark');
 $('themeToggle').addEventListener('click', () => {
   const next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
   localStorage.setItem(themeKey, next);
@@ -73,6 +73,15 @@ function render() {
   $('budgetBar').style.width = budget ? `${Math.min(100, expense / budget * 100)}%` : '0%';
   $('budgetBar').style.background = budget && expense > budget ? '#cf5b55' : '#37a477';
   $('budgetNote').textContent = budget ? (expense > budget ? `Você passou ${money(expense - budget)} do limite.` : `Restam ${money(Math.max(0, budget - expense))} do seu limite.`) : 'Defina um limite para acompanhar seu orçamento.';
+  const milestone = Math.floor(month.length / 5) + 1;
+  const progressCount = month.length % 5;
+  const remaining = 5 - progressCount;
+  $('monthlyMilestoneTag').textContent = `MARCO ${milestone}`;
+  $('monthlyMilestone').textContent = month.length === 0
+    ? 'Registre seu primeiro lançamento do mês'
+    : `${remaining} ${remaining === 1 ? 'lançamento' : 'lançamentos'} para o próximo marco`;
+  $('monthlyProgressBar').style.width = `${progressCount / 5 * 100}%`;
+  $('monthlyProgressFoot').textContent = `${progressCount} de 5 lançamentos · ${month.length} neste mês`;
   renderCategories(month);
   renderChart(month);
   renderRows(month);
