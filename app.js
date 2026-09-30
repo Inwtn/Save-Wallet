@@ -239,6 +239,10 @@ async function initialize() {
   });
 
   $('monthPicker').addEventListener('change', event => { selectedMonth = event.target.value || selectedMonth; render(); });
+  document.querySelectorAll('.nav-item').forEach(link => link.addEventListener('click', () => {
+    document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
+    link.classList.add('active');
+  }));
   $('search').addEventListener('input', () => renderRows(monthTransactions()));
   $('typeFilter').addEventListener('change', () => renderRows(monthTransactions()));
   $('addButton').addEventListener('click', () => { $('txDate').value = new Date().toLocaleDateString('sv-SE'); $('transactionDialog').showModal(); });
