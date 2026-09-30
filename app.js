@@ -8,6 +8,7 @@ const money = value => new Intl.NumberFormat('pt-BR', { style: 'currency', curre
 let supabaseClient;
 let currentUser;
 let transactions = [];
+let recurringExpenses = [];
 let budget = 0;
 let selectedMonth = new Date().toLocaleDateString('sv-SE').slice(0, 7);
 let authMode = 'signin';
@@ -49,6 +50,7 @@ function setAuthenticated(user) {
   } else {
     loadedUserId = null;
     transactions = [];
+    recurringExpenses = [];
     budget = 0;
   }
 }
@@ -74,6 +76,35 @@ function render() {
   renderCategories(month);
   renderChart(month);
   renderRows(month);
+  renderPlanning();
+}
+
+function renderPlanning() {
+  const activeFor = month => recurringExpenses.filter(item => {
+    const starts = item.start_month.slice(0, 7);
+    const ends = item.end_month ? item.end_month.slice(0, 7) : null;
+    return starts <= month && (!ends || ends >= month);
+  });
+  const totalFor = month => activeFor(month).reduce((sum, item) => sum + Number(item.monthly_amount), 0);
+  const selectedTotal = totalFor(selectedMonth);
+  $('plannedTotal').textContent = money(selectedTotal);
+  $('plannedMonthLabel').textContent = new Date(`${selectedMonth}-01T12:00:00`).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+
+  const [year, monthNumber] = selectedMonth.split('-').map(Number);
+  const forecastMonths = Array.from({ length: 12 }, (_, index) => {
+    const monthDate = new Date(year, monthNumber - 1 + index, 1);
+    const monthKey = monthDate.toLocaleDateString('sv-SE').slice(0, 7);
+    const label = monthDate.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+    return `<div class="forecast-month ${index === 0 ? 'current' : ''}"><span>${esc(label)}</span><strong>${money(totalFor(monthKey))}</strong></div>`;
+  });
+  $('forecastGrid').innerHTML = forecastMonths.join('');
+
+  const plans = [...recurringExpenses].sort((a, b) => a.start_month.localeCompare(b.start_month));
+  $('plannedList').innerHTML = plans.length ? plans.map(item => {
+    const start = new Date(`${item.start_month.slice(0, 7)}-01T12:00:00`).toLocaleDateString('pt-BR', { month: 'short', year: 'numeric' });
+    const end = item.end_month ? new Date(`${item.end_month.slice(0, 7)}-01T12:00:00`).toLocaleDateString('pt-BR', { month: 'short', year: 'numeric' }) : 'sem data para terminar';
+    return `<div class="planned-item"><div><div class="planned-item-name">${esc(item.description)}</div><div class="planned-item-meta">${esc(start)} até ${esc(end)}</div></div><div class="forecast-actions"><span class="planned-item-amount">${money(item.monthly_amount)} / mês</span><button class="delete-plan" data-id="${esc(item.id)}" type="button" aria-label="Excluir ${esc(item.description)}" title="Excluir">×</button></div></div>`;
+  }).join('') : '<div class="forecast-empty">Adicione suas despesas mensais para ver a previsão.</div>';
 }
 
 function renderCategories(month) {
@@ -125,13 +156,16 @@ function toast(message) {
 }
 
 async function loadAccountData(user) {
-  const [transactionResult, settingResult] = await Promise.all([
+  const [transactionResult, settingResult, recurringResult] = await Promise.all([
     supabaseClient.from('finance_transactions').select('id,user_id,type,description,amount,category,date').eq('user_id', user.id).order('date', { ascending: false }),
-    supabaseClient.from('finance_settings').select('monthly_budget').eq('user_id', user.id).maybeSingle()
+    supabaseClient.from('finance_settings').select('monthly_budget').eq('user_id', user.id).maybeSingle(),
+    supabaseClient.from('finance_recurring_expenses').select('id,user_id,description,monthly_amount,start_month,end_month').eq('user_id', user.id).order('start_month')
   ]);
   if (transactionResult.error) throw transactionResult.error;
   if (settingResult.error) throw settingResult.error;
+  if (recurringResult.error) throw recurringResult.error;
   transactions = (transactionResult.data || []).map(item => ({ ...item, amount: Number(item.amount) }));
+  recurringExpenses = (recurringResult.data || []).map(item => ({ ...item, monthly_amount: Number(item.monthly_amount) }));
   budget = Number(settingResult.data?.monthly_budget) || 0;
   render();
 }
@@ -165,6 +199,8 @@ function setAuthMode(mode) {
 
 async function initialize() {
   $('monthPicker').value = selectedMonth;
+  $('plannedStart').value = selectedMonth;
+  $('plannedEnd').min = selectedMonth;
   setCategories('expense');
   setAuthMode('signin');
 
@@ -295,6 +331,52 @@ async function initialize() {
     budget = monthlyBudget;
     render();
     toast('Orçamento atualizado');
+  });
+
+  $('plannedStart').addEventListener('change', () => {
+    $('plannedEnd').min = $('plannedStart').value;
+    if ($('plannedEnd').value && $('plannedEnd').value < $('plannedStart').value) $('plannedEnd').value = '';
+  });
+  $('plannedExpenseForm').addEventListener('submit', async event => {
+    event.preventDefault();
+    const startMonth = $('plannedStart').value;
+    const endMonth = $('plannedEnd').value;
+    if (endMonth && endMonth < startMonth) {
+      toast('O mês final precisa ser igual ou posterior ao mês inicial.');
+      return;
+    }
+    const submit = $('plannedExpenseForm').querySelector('button[type="submit"]');
+    submit.disabled = true;
+    const row = {
+      user_id: currentUser.id,
+      description: $('plannedDescription').value.trim(),
+      monthly_amount: Number($('plannedAmount').value),
+      start_month: `${startMonth}-01`,
+      end_month: endMonth ? `${endMonth}-01` : null
+    };
+    try {
+      const { data, error } = await supabaseClient.from('finance_recurring_expenses').insert(row).select('id,user_id,description,monthly_amount,start_month,end_month').single();
+      if (error) throw error;
+      recurringExpenses.push({ ...data, monthly_amount: Number(data.monthly_amount) });
+      $('plannedExpenseForm').reset();
+      $('plannedStart').value = selectedMonth;
+      $('plannedEnd').min = selectedMonth;
+      renderPlanning();
+      toast('Despesa mensal adicionada');
+    } catch (error) {
+      toast(`NÃ£o foi possÃ­vel salvar: ${authError(error)}`);
+    } finally {
+      submit.disabled = false;
+    }
+  });
+  $('plannedList').addEventListener('click', async event => {
+    const button = event.target.closest('.delete-plan');
+    if (!button) return;
+    const { error } = await supabaseClient.from('finance_recurring_expenses').delete().eq('id', button.dataset.id).eq('user_id', currentUser.id);
+    if (error) { toast(`NÃ£o foi possÃ­vel excluir: ${authError(error)}`); return; }
+    recurringExpenses = recurringExpenses.filter(item => item.id !== button.dataset.id);
+    renderPlanning();
+    toast('Despesa mensal removida');
   });
 
   supabaseClient.auth.onAuthStateChange((event, session) => {
