@@ -284,9 +284,22 @@ async function initialize() {
   });
 
   $('monthPicker').addEventListener('change', event => { selectedMonth = event.target.value || selectedMonth; render(); });
-  document.querySelectorAll('.nav-item').forEach(link => link.addEventListener('click', () => {
+  document.querySelectorAll('.nav-item').forEach(link => link.addEventListener('click', event => {
+    event.preventDefault();
     document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
     link.classList.add('active');
+
+    const showPlanning = link.dataset.view === 'planning';
+    $('dashboardView').hidden = showPlanning;
+    $('planningView').hidden = !showPlanning;
+    $('dashboardTitle').textContent = showPlanning ? 'Planejamento mensal' : 'Visão geral';
+    history.replaceState(null, '', link.hash);
+
+    if (link.dataset.target) {
+      $(link.dataset.target).scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } else {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
   }));
   $('search').addEventListener('input', () => renderRows(monthTransactions()));
   $('typeFilter').addEventListener('change', () => renderRows(monthTransactions()));

@@ -73,15 +73,16 @@
     <aside class="sidebar">
       <div class="brand"><div class="brand-mark">↗</div>Save Wallet</div>
       <div class="nav-label">Visão geral</div>
-      <a class="nav-item active" href="#inicio"><span class="nav-icon">▦</span>Dashboard</a>
-      <a class="nav-item" href="#transacoes"><span class="nav-icon">⇄</span>Transações</a>
-      <a class="nav-item" href="#planejamento"><span class="nav-icon">▤</span>Planejamento</a>
-      <a class="nav-item" href="#orcamento"><span class="nav-icon">◷</span>Orçamento</a>
+      <a class="nav-item active" href="#inicio" data-view="dashboard"><span class="nav-icon">▦</span>Dashboard</a>
+      <a class="nav-item" href="#transacoes" data-target="transacoes"><span class="nav-icon">⇄</span>Transações</a>
+      <a class="nav-item" href="#planejamento" data-view="planning"><span class="nav-icon">▤</span>Planejamento</a>
+      <a class="nav-item" href="#orcamento" data-target="orcamento"><span class="nav-icon">◷</span>Orçamento</a>
       <div class="sidebar-bottom"><strong>Um passo de cada vez.</strong>Pequenos cuidados hoje fazem diferença no fim do mês. 🌱</div>
     </aside>
     <main class="main" id="inicio">
       <p class="app-message" id="appMessage" role="alert" hidden></p>
-      <header class="topline"><div><div class="eyebrow">Seu dinheiro, mais organizado</div><h1 class="title">Visão geral</h1></div><div class="top-actions"><input class="month-picker" id="monthPicker" type="month" aria-label="Selecionar mês"><button class="theme-toggle" id="themeToggle" type="button" aria-label="Ativar modo escuro" title="Alternar tema">☾</button><span class="user-email" id="userEmail"></span><button class="sign-out" id="signOut" type="button">Sair</button></div></header>
+      <header class="topline"><div><div class="eyebrow">Seu dinheiro, mais organizado</div><h1 class="title" id="dashboardTitle">Visão geral</h1></div><div class="top-actions"><input class="month-picker" id="monthPicker" type="month" aria-label="Selecionar mês"><button class="theme-toggle" id="themeToggle" type="button" aria-label="Ativar modo escuro" title="Alternar tema">☾</button><span class="user-email" id="userEmail"></span><button class="sign-out" id="signOut" type="button">Sair</button></div></header>
+      <div id="dashboardView">
       <section class="cards" aria-label="Resumo do mês">
         <article class="card"><div class="card-head">Saldo do mês <span class="card-icon">◈</span></div><div class="card-value" id="balance">R$ 0,00</div><div class="card-foot" id="balanceFoot">Receitas menos despesas</div></article>
         <article class="card"><div class="card-head">Receitas <span class="card-icon">↗</span></div><div class="card-value positive" id="income">R$ 0,00</div><div class="card-foot">Entradas neste mês</div></article>
@@ -93,6 +94,9 @@
         <article class="panel"><div class="panel-heading"><div><h2 class="panel-title">Despesas por categoria</h2><div class="panel-subtitle">Onde seu dinheiro está indo</div></div></div><div class="category-list" id="categories"></div></article>
         <article class="panel progress-panel"><div class="panel-heading"><div><h2 class="panel-title">Ritmo do mês</h2><div class="panel-subtitle">Pequenos passos deixam seu mês mais claro</div></div><span class="milestone-tag" id="monthlyMilestoneTag">MARCO 1</span></div><div class="milestone-copy" id="monthlyMilestone">Registre seu primeiro lançamento do mês</div><div class="milestone-track"><span id="monthlyProgressBar" style="width:0%"></span></div><div class="milestone-foot" id="monthlyProgressFoot">0 de 5 lançamentos para o próximo marco</div></article>
       </section>
+      <section class="panel table-panel" id="transacoes"><div class="panel-heading"><div><h2 class="panel-title">Transações</h2><div class="panel-subtitle">Filtre para ver receitas e despesas separadas</div></div><div class="table-tools"><input class="search" id="search" placeholder="⌕  Buscar transação" aria-label="Buscar transação"><select class="filter" id="typeFilter" aria-label="Filtrar por tipo"><option value="all">Todas</option><option value="income">Receitas</option><option value="expense">Despesas</option></select><button class="add-button" id="addButton">＋ Nova transação</button></div></div><div class="table-wrap"><table><thead><tr><th>Descrição</th><th>Categoria</th><th>Data</th><th>Tipo</th><th>Valor</th><th></th></tr></thead><tbody id="transactionRows"></tbody></table></div></section>
+      </div>
+      <div id="planningView" hidden>
       <section class="panel planning-panel" id="planejamento">
         <div class="panel-heading"><div><h2 class="panel-title">Planejamento mensal</h2><div class="panel-subtitle">Cadastre os custos previstos e veja a receita necessária nos próximos 12 meses</div></div><span class="card-icon">▤</span></div>
         <div class="forecast-highlight"><div><span>Receita mínima para cobrir os custos no mês selecionado</span><strong id="plannedTotal">R$ 0,00</strong></div><small id="plannedMonthLabel"></small></div>
@@ -108,7 +112,7 @@
         </form>
         <div class="planned-list" id="plannedList"></div>
       </section>
-      <section class="panel table-panel" id="transacoes"><div class="panel-heading"><div><h2 class="panel-title">Transações</h2><div class="panel-subtitle">Filtre para ver receitas e despesas separadas</div></div><div class="table-tools"><input class="search" id="search" placeholder="⌕  Buscar transação" aria-label="Buscar transação"><select class="filter" id="typeFilter" aria-label="Filtrar por tipo"><option value="all">Todas</option><option value="income">Receitas</option><option value="expense">Despesas</option></select><button class="add-button" id="addButton">＋ Nova transação</button></div></div><div class="table-wrap"><table><thead><tr><th>Descrição</th><th>Categoria</th><th>Data</th><th>Tipo</th><th>Valor</th><th></th></tr></thead><tbody id="transactionRows"></tbody></table></div></section>
+      </div>
     </main>
   </div>
   <dialog id="transactionDialog"><form class="modal" id="transactionForm"><div class="modal-head"><h2 class="modal-title">Nova transação</h2><button class="close" type="button" id="closeDialog" aria-label="Fechar">×</button></div><div class="field"><label>Tipo de transação</label><div class="type-toggle"><button type="button" class="selected" data-type="expense">Despesa</button><button type="button" data-type="income">Receita</button></div></div><input type="hidden" id="txType" value="expense"><div class="field"><label for="txDescription">Descrição</label><input id="txDescription" required maxlength="60" placeholder="Ex.: Supermercado"></div><div class="field"><label for="txAmount">Valor (R$)</label><input id="txAmount" type="number" required min="0.01" step="0.01" placeholder="0,00"></div><div class="field"><label for="txCategory">Categoria</label><select id="txCategory"></select></div><div class="field"><label for="txDate">Data</label><input id="txDate" type="date" required></div><button class="submit" type="submit">Salvar transação</button></form></dialog><div class="toast" id="toast"></div>
