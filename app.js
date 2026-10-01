@@ -11,6 +11,8 @@ let transactions = [];
 let recurringExpenses = [];
 let budget = 0;
 let selectedMonth = new Date().toLocaleDateString('sv-SE').slice(0, 7);
+let planningBaseMonth = selectedMonth;
+let monthDetailOpen = false;
 let authMode = 'signin';
 let loadedUserId = null;
 
@@ -99,14 +101,25 @@ function renderPlanning() {
   $('plannedTotal').textContent = money(selectedTotal);
   $('plannedMonthLabel').textContent = new Date(`${selectedMonth}-01T12:00:00`).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
 
-  const [year, monthNumber] = selectedMonth.split('-').map(Number);
+  const [year, monthNumber] = planningBaseMonth.split('-').map(Number);
+  const currentCalendarMonth = new Date().toLocaleDateString('sv-SE').slice(0, 7);
   const forecastMonths = Array.from({ length: 12 }, (_, index) => {
     const monthDate = new Date(year, monthNumber - 1 + index, 1);
     const monthKey = monthDate.toLocaleDateString('sv-SE').slice(0, 7);
     const label = monthDate.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
-    return `<div class="forecast-month ${index === 0 ? 'current' : ''}"><span>${esc(label)}</span><strong>${money(totalFor(monthKey))}</strong></div>`;
+    const classes = ['forecast-month', monthKey === currentCalendarMonth ? 'current' : '', monthKey === selectedMonth ? 'selected' : ''].filter(Boolean).join(' ');
+    return `<button class="${classes}" type="button" data-month="${monthKey}" aria-pressed="${monthKey === selectedMonth}"><span>${esc(label)}</span><strong>${money(totalFor(monthKey))}</strong></button>`;
   });
   $('forecastGrid').innerHTML = forecastMonths.join('');
+
+  const selectedMonthLabel = new Date(`${selectedMonth}-01T12:00:00`).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+  $('monthDetailLabel').textContent = selectedMonthLabel;
+  $('monthDetail').hidden = !monthDetailOpen;
+  const monthPlans = activeFor(selectedMonth).sort((a, b) => a.description.localeCompare(b.description, 'pt-BR'));
+  $('monthPlanList').innerHTML = monthPlans.length ? monthPlans.map(item => {
+    const oneMonthOnly = item.end_month && item.start_month.slice(0, 7) === selectedMonth && item.end_month.slice(0, 7) === selectedMonth;
+    return `<div class="planned-item"><div><div class="planned-item-name">${esc(item.description)}</div><div class="planned-item-meta">${oneMonthOnly ? 'Somente neste mês' : 'Despesa recorrente'}</div></div><div class="forecast-actions"><span class="planned-item-amount">${money(item.monthly_amount)}</span><button class="delete-plan" data-id="${esc(item.id)}" type="button" aria-label="Excluir ${esc(item.description)}" title="Excluir">×</button></div></div>`;
+  }).join('') : '<div class="forecast-empty">Nenhum custo lançado para este mês.</div>';
 
   const plans = [...recurringExpenses].sort((a, b) => a.start_month.localeCompare(b.start_month));
   $('plannedList').innerHTML = plans.length ? plans.map(item => {
@@ -283,7 +296,43 @@ async function initialize() {
     if (error) toast(authError(error));
   });
 
-  $('monthPicker').addEventListener('change', event => { selectedMonth = event.target.value || selectedMonth; render(); });
+  $('monthPicker').addEventListener('change', event => {
+    selectedMonth = event.target.value || selectedMonth;
+    planningBaseMonth = selectedMonth;
+    render();
+  });
+  $('forecastGrid').addEventListener('click', event => {
+    const button = event.target.closest('.forecast-month');
+    if (!button) return;
+    selectedMonth = button.dataset.month;
+    $('monthPicker').value = selectedMonth;
+    monthDetailOpen = true;
+    render();
+  });
+  $('singleMonthExpenseForm').addEventListener('submit', async event => {
+    event.preventDefault();
+    const submit = $('singleMonthExpenseForm').querySelector('button[type="submit"]');
+    submit.disabled = true;
+    const row = {
+      user_id: currentUser.id,
+      description: $('singleMonthDescription').value.trim(),
+      monthly_amount: Number($('singleMonthAmount').value),
+      start_month: `${selectedMonth}-01`,
+      end_month: `${selectedMonth}-01`
+    };
+    try {
+      const { data, error } = await supabaseClient.from('finance_recurring_expenses').insert(row).select('id,user_id,description,monthly_amount,start_month,end_month').single();
+      if (error) throw error;
+      recurringExpenses.push({ ...data, monthly_amount: Number(data.monthly_amount) });
+      $('singleMonthExpenseForm').reset();
+      render();
+      toast('Custo adicionado somente neste mês');
+    } catch (error) {
+      toast(`Não foi possível salvar: ${authError(error)}`);
+    } finally {
+      submit.disabled = false;
+    }
+  });
   document.querySelectorAll('.nav-item').forEach(link => link.addEventListener('click', event => {
     event.preventDefault();
     document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
@@ -391,15 +440,17 @@ async function initialize() {
       submit.disabled = false;
     }
   });
-  $('plannedList').addEventListener('click', async event => {
+  const handlePlannedDelete = async event => {
     const button = event.target.closest('.delete-plan');
     if (!button) return;
     const { error } = await supabaseClient.from('finance_recurring_expenses').delete().eq('id', button.dataset.id).eq('user_id', currentUser.id);
     if (error) { toast(`NÃ£o foi possÃ­vel excluir: ${authError(error)}`); return; }
     recurringExpenses = recurringExpenses.filter(item => item.id !== button.dataset.id);
-    renderPlanning();
+    render();
     toast('Despesa mensal removida');
-  });
+  };
+  $('plannedList').addEventListener('click', handlePlannedDelete);
+  $('monthPlanList').addEventListener('click', handlePlannedDelete);
 
   supabaseClient.auth.onAuthStateChange((event, session) => {
     if (event === 'PASSWORD_RECOVERY') {
